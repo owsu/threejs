@@ -78,6 +78,41 @@ gui.add(light, 'distance', 0, 40).onChange(updateLight);
 
 makeXYZGUI(gui, light.position, 'position', updateLight);
 
+const material = new THREE.ShaderMaterial({
+    uniforms: {
+        uTime: {value: 0.0},
+        uColor: {value: new THREE.Color(0x00ff00)}
+    },
+
+    vertexShader: `
+        varying vec2 vUv;
+        
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+
+    fragmentShader: `
+        uniform float uTime;
+        varying vec2 vUv;
+        
+        void main() {
+            float dist = distance(vUv, vec2(0.5, 0.5));
+            float glow = smoothstep(0.5, 0.0, dist);
+            float pulse = sin(uTime) * 0.5 + 0.5;
+            gl_FragColor = vec4(glow * pulse, 0.0, glow * (1.0 - pulse), 1.0);
+        }
+    `
+})
+
+{
+    const shaderGeo = new THREE.SphereGeometry(2, 32, 16);
+    const shaderMesh = new THREE.Mesh(shaderGeo, material)
+    shaderMesh.position.set(5,2,-10)
+    shaderMesh.receiveShadow = true;
+    scene.add(shaderMesh)
+}
 
 {
     const loader = new THREE.TextureLoader();
@@ -133,9 +168,9 @@ makeXYZGUI(gui, light.position, 'position', updateLight);
 renderer.shadowMap.enabled = true;
 light.castShadow = true;
 
-function render() {
-  renderer.render(scene, camera);
-  requestAnimationFrame(render);
+function animate(time) {
+    material.uniforms.uTime.value = time * .001;
+    renderer.render(scene, camera);
 }
 
-render();
+renderer.setAnimationLoop(animate);
