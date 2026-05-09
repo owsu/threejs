@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+import vertexShader from '/shaders/boid.vert?raw';
+import fragmentShader from '/shaders/boid.frag?raw';
+
 
 class ColorGUIHelper {
     constructor(object, prop) {
@@ -78,42 +81,7 @@ gui.add(light, 'distance', 0, 40).onChange(updateLight);
 
 makeXYZGUI(gui, light.position, 'position', updateLight);
 
-const material = new THREE.ShaderMaterial({
-    uniforms: {
-        uTime: {value: 0.0},
-        uColor: {value: new THREE.Color(0x00ff00)}
-    },
-
-    vertexShader: `
-        varying vec2 vUv;
-        
-        void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-    `,
-
-    fragmentShader: `
-        uniform float uTime;
-        varying vec2 vUv;
-        
-        void main() {
-            float dist = distance(vUv, vec2(0.5, 0.5));
-            float glow = smoothstep(0.5, 0.0, dist);
-            float pulse = sin(uTime) * 0.5 + 0.5;
-            gl_FragColor = vec4(glow * pulse, 0.0, glow * (1.0 - pulse), 1.0);
-        }
-    `
-})
-
-{
-    const shaderGeo = new THREE.SphereGeometry(2, 32, 16);
-    const shaderMesh = new THREE.Mesh(shaderGeo, material)
-    shaderMesh.position.set(5,2,-10)
-    shaderMesh.receiveShadow = true;
-    scene.add(shaderMesh)
-}
-
+// baseplate
 {
     const loader = new THREE.TextureLoader();
 
@@ -139,31 +107,29 @@ const material = new THREE.ShaderMaterial({
     scene.add(planeMesh);
 }
 
-// cube
-{
-    const geo = new THREE.BoxGeometry(4, 4, 4);
-    const mat = new THREE.MeshPhongMaterial({
-        color: "#8AC" }
-    );
+const material = new THREE.ShaderMaterial({
+    uniforms: {
+        uTime: { value: 0.0 }
+    },
 
-    const cube = new THREE.Mesh(geo, mat);
-    cube.position.set(5, 2, 0);
-    cube.castShadow = true;
-    scene.add(cube);
+    vertexShader,
+    fragmentShader
+})
+
+{
+   for (let i = 0; i < 25; i++) {
+        const boidGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
+        const boidMesh = new THREE.Mesh(boidGeo, material)
+        boidMesh.position.set(
+            (Math.random() - 0.5) * 20,
+            (Math.random() * 5) + 2,
+            (Math.random() - 0.5) * 20
+        )
+        boidMesh.receiveShadow = true;
+        scene.add(boidMesh)
+   }
 }
 
-// sphere
-{
-    const geo = new THREE.SphereGeometry(3, 32, 16);
-    const mat = new THREE.MeshPhongMaterial({ 
-        color: "#CA8"}
-    );
-
-    const sphere = new THREE.Mesh(geo, mat);
-    sphere.position.set(-4, 3, 0);
-    sphere.castShadow = true;
-    scene.add(sphere);
-}
 
 renderer.shadowMap.enabled = true;
 light.castShadow = true;
