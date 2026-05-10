@@ -116,6 +116,8 @@ const material = new THREE.ShaderMaterial({
     fragmentShader
 })
 
+// boids
+const boids = [];
 {
    for (let i = 0; i < 25; i++) {
         const boidGeo = new THREE.ConeGeometry(0.2, 0.5, 8);
@@ -125,7 +127,14 @@ const material = new THREE.ShaderMaterial({
             (Math.random() * 5) + 2,
             (Math.random() - 0.5) * 20
         )
-        boidMesh.receiveShadow = true;
+
+        const velocity = new THREE.Vector3(
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05,
+            (Math.random() - 0.5) * 0.05
+        )
+
+        boids.push({ mesh: boidMesh, velocity });
         scene.add(boidMesh)
    }
 }
@@ -136,6 +145,63 @@ light.castShadow = true;
 
 function animate(time) {
     material.uniforms.uTime.value = time * .001;
+
+    const BOUNDS = 15;
+    boids.forEach(boid => {
+        if (boid.mesh.position.x > BOUNDS) boid.mesh.position.x = -BOUNDS;
+        if (boid.mesh.position.x < -BOUNDS) boid.mesh.position.x = BOUNDS;
+        if (boid.mesh.position.z > BOUNDS) boid.mesh.position.z = -BOUNDS;
+        if (boid.mesh.position.z < -BOUNDS) boid.mesh.position.z = BOUNDS;
+        if (boid.mesh.position.y < 2) {
+            boid.mesh.position.y = 2;
+            boid.velocity.y = Math.abs(boid.velocity.y); // reflect upward
+        }
+        if (boid.mesh.position.y > BOUNDS) {
+            boid.mesh.position.y = BOUNDS;
+            boid.velocity.y = -Math.abs(boid.velocity.y); // reflect downward
+        }
+        
+        boid.mesh.position.add(boid.velocity);
+
+        const SEPARATION_RADIUS = 2.0;
+        const SEPARATION_FORCE = 0.01;
+        const MAX_SPEED = 0.05;
+        const separation = new THREE.Vector3();
+
+        boids.forEach(other => {
+            if (other === boid) {return;}
+
+            const dist = boid.mesh.position.distanceTo(other.mesh.position);
+
+            if (dist < SEPARATION_RADIUS && dist > 0) {
+                const push = boid.mesh.position.clone()
+                    .sub(other.mesh.position)
+                    .normalize()
+                    .multiplyScalar(SEPARATION_FORCE / dist);
+                
+                    separation.add(push)
+            }
+        });
+
+        const speed = boid.velocity.length();
+        if (speed > MAX_SPEED) {
+            boid.velocity.divideScalar(speed / MAX_SPEED);
+        }
+
+        if (speed > 0) {
+            const direction = boid.velocity.clone().normalize();
+            boid.mesh.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0), // cone points up by default
+                direction
+            );
+        }
+
+        boid.velocity.add(separation);
+    });
+
+    
+
+
     renderer.render(scene, camera);
 }
 
